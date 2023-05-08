@@ -409,26 +409,25 @@ const resolvers = {
 const server = new ApolloServer({
     typeDefs,
     resolvers,
-    introspection: process.env.NODE_ENV !== 'production',
 })
 
 const port = process.env.PORT || 4000
 
 const { url } = await startStandaloneServer(server, {
     listen: { port: parseInt(port) },
-    context: async ({ req, res }) => {
-        // Get the user token from the headers.
-        const token = req.headers.authorization || ''
+    // context: async ({ req, res }) => {
+    //     // Get the user token from the headers.
+    //     const token = req.headers.authorization || ''
 
-        // Try to retrieve a user with the token
-        const payload = await jwt_decode(token.split(' ')[1])
-        const user = await User.findOne({ auth0UserId: payload._id })
-        // Libreria JWT para verificar, JWD.verify ( el token y el secreto)
-        // console.log(payload)
-        // Add the user to the context
-        return { token: user }
-        //return {user}
-    },
+    //     // Try to retrieve a user with the token
+    //     const payload = await jwt_decode(token.split(' ')[1])
+    //     const user = await User.findOne({ auth0UserId: payload._id })
+    //     // Libreria JWT para verificar, JWD.verify ( el token y el secreto)
+    //     // console.log(payload)
+    //     // Add the user to the context
+    //     return { token: user }
+    //     //return {user}
+    // },
 })
 
 // const { url } = await startStandaloneServer(server, {
