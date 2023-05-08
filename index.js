@@ -209,13 +209,40 @@ const resolvers = {
             console.log('user find', { user })
             return user
         },
+        // findUsersOnSalida: async (_, { salidaId }) => {
+        //     const salida = await Salidas.findById(salidaId)
+        //     console.log('findUsersOnSalida', salida.users)
+
+        //     if (!salida) {
+        //         throw new Error('Salida not found')
+        //     }
+        //     const users = await User.find({ auth0UserId: { $in: salida.users } })
+        //         .populate({
+        //             path: 'data',
+        //             select: 'name adress phone profession obraSocial alergiaMedicamentos alergiaAlimentos tipoSangre ',
+        //             options: { lean: true },
+        //             perDocumentLimit: 1,
+        //         })
+        //         .lean()
+        //     if (users && users.length > 0) {
+        //         const userData = users[0].data
+        //         if (userData && userData.length > 0) {
+        //             console.log(userData[0])
+        //             return userData
+        //         } else {
+        //             return []
+        //         }
+        //     } else {
+        //         return []
+        //     }
+        // },
         findUsersOnSalida: async (_, { salidaId }) => {
             const salida = await Salidas.findById(salidaId)
-            console.log('findUsersOnSalida', salida.users)
 
             if (!salida) {
                 throw new Error('Salida not found')
             }
+
             const users = await User.find({ auth0UserId: { $in: salida.users } })
                 .populate({
                     path: 'data',
@@ -224,14 +251,28 @@ const resolvers = {
                     perDocumentLimit: 1,
                 })
                 .lean()
+
             if (users && users.length > 0) {
-                const userData = users[0].data
-                if (userData && userData.length > 0) {
-                    console.log(userData[0])
-                    return userData
-                } else {
-                    return []
-                }
+                const userData = users
+                    .map((user) => {
+                        if (user.data && user.data.length > 0) {
+                            return {
+                                name: user.data[0].name || '',
+                                address: user.data[0].address || '',
+                                phone: user.data[0].phone || '',
+                                profession: user.data[0].profession || '',
+                                obraSocial: user.data[0].obraSocial || '',
+                                alergiaMedicamentos: user.data[0].alergiaMedicamentos || '',
+                                alergiaAlimentos: user.data[0].alergiaAlimentos || '',
+                                tipoSangre: user.data[0].tipoSangre || '',
+                            }
+                        } else {
+                            return null
+                        }
+                    })
+                    .filter((userData) => userData !== null)
+
+                return userData
             } else {
                 return []
             }
