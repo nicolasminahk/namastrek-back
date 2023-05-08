@@ -412,6 +412,8 @@ const server = new ApolloServer({
     introspection: process.env.NODE_ENV !== 'production',
 })
 
+const port = process.env.PORT || 4000
+
 const { url } = await startStandaloneServer(server, {
     listen: { port: 4000 },
     context: async ({ req, res }) => {
