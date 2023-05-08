@@ -1,0 +1,34 @@
+{
+    "persons": [
+        {
+            "name": "Nicolas Minahk",
+            "phone": "3814012014",
+            "street": "Saavedra 1061",
+            "city": "Tucuman",
+            "id": "1",
+            "alergias": ["off", "ibuprofeno"],
+            "tipoDeSangre": "A+",
+            "salidas": "2"
+        },
+        {
+            "name": "Agustin Minahk",
+            "phone": "3814012014",
+            "street": "Italia 1500",
+            "city": "Cordoba",
+            "id": "2",
+            "alergias": [],
+            "tipoDeSangre": "A-",
+            "salidas": null
+        },
+        {
+            "name": "Mica",
+            "phone": "3814189066",
+            "street": "Bulnes 236",
+            "city": "Tafí Viejo",
+            "id": "3",
+            "alergias": ["pollo", "jamon", "miel"],
+            "tipoDeSangre": "0+",
+            "salidas": "0"
+        }
+    ]
+}
