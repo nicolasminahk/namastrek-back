@@ -233,12 +233,11 @@ const resolvers = {
                 throw error
             }
         },
-
         findDataByAuth0UserId: async (root, { auth0UserId }) => {
             // const user = await User.find({ auth0UserId })
-            const user = await Data.findOne({ auth0UserId })
+            const user = await Data.find({ auth0UserId })
             console.log('user find', { user })
-            return user
+            return user[0]
         },
         findUsersOnSalida: async (_, { salidaId }) => {
             const salida = await Salidas.findById(salidaId)
