@@ -5,22 +5,22 @@ const schema = mongoose.Schema(
     {
         name: {
             type: String,
-            required: true,
+            // required: true,
         },
         description: {
             type: String,
             minlength: 5,
-            required: true,
+            // required: true,
         },
         date: {
             default: Date.now,
             type: String,
-            required: true,
+            // required: true,
         },
         vencimiento: {
             type: String,
         },
-        users: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+        users: [{ type: String, ref: 'User' }],
     },
     { timestamps: true }
 )
