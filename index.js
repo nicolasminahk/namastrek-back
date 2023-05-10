@@ -74,11 +74,11 @@ const typeDefs = gql`
     }
 
     type Beneficios {
-        name: String!
+        name: String
         id: ID!
-        description: String!
-        date: String!
-        users: [User!]!
+        description: String
+        date: String
+        users: [String!]
     }
 
     type Tips {
@@ -102,7 +102,8 @@ const typeDefs = gql`
         protectedQuery(id: ID!): User
         findSalidasByAuth0UserId(auth0UserId: String!): [Salidas!]!
         findUsersOnSalida(salidaId: String!): [Data!]!
-        findDataByAuth0UserId(auth0UserId: String!): User!
+        findDataByAuth0UserId(auth0UserId: String!): Data!
+        findBenefitByAuth0UserId(auth0UserId: String!): [Beneficios!]!
     }
 
     type Mutation {
@@ -123,7 +124,7 @@ const typeDefs = gql`
         deleteSalidas(id: ID!): Salidas
         protectedMutation(id: ID!): User
         addPersonExit(salida: String!, auth0UserId: String!): Salidas
-        addPersonBenefit(benefit: String!, auth0UserId: String!): Beneficios
+        addPersonBenefit(benefit: String!, auth0UserId: String!): User
         createUser(id: String!, email: String!): User
         addDataToUser(data: DataInput!, auth0UserId: String!): User
         removePersonExit(salida: String!, auth0UserId: String!): Salidas
@@ -204,8 +205,38 @@ const resolvers = {
             const salidas = await Salidas.find({ users: auth0UserId })
             return salidas
         },
+        // findBenefitByAuth0UserId: async (root, { auth0UserId }) => {
+        //     // Busca todas los beneficios que contengan el auth0UserId en el arreglo de users
+
+        //     const benefit = await Beneficios.find({ users: auth0UserId })
+        //     console.log('findBenefitByAuth0UserId', benefit)
+        //     return benefit
+        // },
+        // findBenefitByAuth0UserId: async (root, { auth0UserId }) => {
+        //     // Busca todas los beneficios que contengan el auth0UserId en el arreglo de users
+        //     const beneficios = await Beneficios.find({ users: auth0UserId })
+        //     console.log('benefit', beneficios)
+        //     // Devuelve los campos de cada beneficio
+        //     return beneficios.map((beneficio) => ({
+        //         name: beneficio.name,
+        //         description: beneficio.description,
+        //         date: beneficio.date,
+        //     }))
+        // },
+        findBenefitByAuth0UserId: async (root, { auth0UserId }) => {
+            try {
+                const beneficios = await Beneficios.find({ users: auth0UserId })
+                console.log('benefit', beneficios)
+                return beneficios
+            } catch (error) {
+                console.error(error)
+                throw error
+            }
+        },
+
         findDataByAuth0UserId: async (root, { auth0UserId }) => {
-            const user = await User.find({ auth0UserId })
+            // const user = await User.find({ auth0UserId })
+            const user = await Data.findOne({ auth0UserId })
             console.log('user find', { user })
             return user
         },
@@ -291,16 +322,6 @@ const resolvers = {
             const newUser = new User({ auth0UserId: args.id, email: args.email })
             return await newUser.save()
         },
-
-        // addSalidas: async (root, args) => {
-        //     const { name, description, date, price, duration, image } = args
-        //     console.log({ args })
-        //     const imageBuffer = Buffer.from(image, 'base64')
-
-        //     const salidas = new Salidas({ name, description, date, price, duration, image: imageBuffer })
-        //     return await salidas.save()
-        // },
-
         addSalidas: async (root, args) => {
             const { name, description, date, price, duration, image } = args
             console.log({ args })
@@ -364,6 +385,31 @@ const resolvers = {
             // Return the updated user entity as part of the mutation response
             return user
         },
+        // addPersonExit: async (root, { salida, auth0UserId }) => {
+        //     console.log('salida', { salida, auth0UserId })
+
+        //     // Busca la salida por su id
+        //     const salidaEncontrada = await Salidas.findById(salida)
+        //     console.log(salidaEncontrada)
+        //     if (!salidaEncontrada) {
+        //         throw new Error('Salida not found') // Puedes personalizar el mensaje de error
+        //     }
+        //     console.log('salida Usuarios', salidaEncontrada.users)
+        //     // Hace un push del auth0UserId al array de usuarios
+        //     salidaEncontrada.users.push(auth0UserId)
+
+        //     // Guarda los cambios en la salida
+        //     const updatedSalida = await salidaEncontrada.save().catch((error) => {
+        //         console.error('Failed to save updated Salida:', error)
+        //         throw new Error('Failed to update Salida') // Puedes personalizar el mensaje de error
+        //     })
+        //     console.log('salida actualizada', updatedSalida) // Verifica que el campo "name" tenga un valor válido
+        //     if (!updatedSalida.name) {
+        //         throw new Error('Failed to update Salida') // Puedes personalizar el mensaje de error
+        //     }
+
+        //     return updatedSalida
+        // },
         addPersonExit: async (root, { salida, auth0UserId }) => {
             console.log('salida', { salida, auth0UserId })
 
@@ -374,25 +420,95 @@ const resolvers = {
                 throw new Error('Salida not found') // Puedes personalizar el mensaje de error
             }
             console.log('salida Usuarios', salidaEncontrada.users)
-            // Hace un push del auth0UserId al array de usuarios
+
+            // Busca al usuario por su auth0UserId
+            const user = await User.findOne({ auth0UserId })
+            if (!user) {
+                throw new Error('User not found') // Puedes personalizar el mensaje de error
+            }
+            console.log('user', user)
+
+            // Hace un push del auth0UserId al array de usuarios en salida
             salidaEncontrada.users.push(auth0UserId)
 
-            // Guarda los cambios en la salida
+            // Hace un push de la salida al arreglo de salidas del usuario
+            user.salidas.push(salida)
+
+            // Guarda los cambios en la salida y el usuario
             const updatedSalida = await salidaEncontrada.save().catch((error) => {
                 console.error('Failed to save updated Salida:', error)
                 throw new Error('Failed to update Salida') // Puedes personalizar el mensaje de error
             })
             console.log('salida actualizada', updatedSalida) // Verifica que el campo "name" tenga un valor válido
+
+            const updatedUser = await user.save().catch((error) => {
+                console.error('Failed to save updated User:', error)
+                throw new Error('Failed to update User') // Puedes personalizar el mensaje de error
+            })
+            console.log('user actualizado', updatedUser) // Verifica que el campo "auth0UserId" tenga un valor válido
+
             if (!updatedSalida.name) {
                 throw new Error('Failed to update Salida') // Puedes personalizar el mensaje de error
             }
 
             return updatedSalida
         },
+
+        // addPersonBenefit: async (root, { benefit, auth0UserId }) => {
+        //     // Busca la salida por su id
+        //     const benefitEncontrado = await Beneficios.findById(benefit)
+        //     console.log(benefitEncontrado)
+        //     if (!benefitEncontrado) {
+        //         throw new Error('Benefit not found') // Puedes personalizar el mensaje de error
+        //     }
+        //     console.log('Beneficio', benefitEncontrado)
+
+        //     // Busca el usuario por su id
+        //     const user = await User.findOne({ auth0UserId })
+        //     console.log('User', user)
+
+        //     // Verifica si el usuario ya tiene dos o más elementos en el arreglo de salidas
+        //     if (user.salidas.length >= 2) {
+        //         // Hace un push del beneficio al arreglo de beneficios del usuario
+        //         user.beneficios.push(benefitEncontrado)
+        //         // Guarda los cambios en la base de datos
+        //         await user.save()
+        //         return user
+        //     } else {
+        //         throw new Error('User does not have enough salidas') // Puedes personalizar el mensaje de error
+        //     }
+        // },
         addPersonBenefit: async (root, { benefit, auth0UserId }) => {
-            console.log({ auth0UserId, benefit })
-            return await Beneficios.updateOne({ _id: benefit }, { $push: { users: auth0UserId } })
+            const benefitEncontrado = await Beneficios.findById(benefit)
+            if (!benefitEncontrado) {
+                throw new Error('Benefit not found') // Puedes personalizar el mensaje de error
+            }
+
+            const user = await User.findOne({ auth0UserId })
+            if (!user) {
+                throw new Error('User not found') // Puedes personalizar el mensaje de error
+            }
+            console.log(user)
+
+            if (user.salidas.length >= 2) {
+                // Hace un push del beneficio al arreglo de beneficios del usuario
+                user.beneficios.push(benefitEncontrado)
+
+                // Hace un push del usuario al arreglo de usuarios del beneficio
+                if (benefitEncontrado) {
+                    benefitEncontrado.users.push(auth0UserId)
+                }
+
+                // Guarda los cambios en la base de datos
+                await user.save()
+                await benefitEncontrado.save()
+
+                return user
+            } else {
+                throw new Error('User does not have enough salidas') // Puedes personalizar el mensaje de error
+            }
         },
+
         addDataToUser: async (_, { data, auth0UserId }) => {
             console.log({ data, auth0UserId })
             console.log('1')
