@@ -12,9 +12,6 @@ import fs from 'fs'
 import os from 'os'
 import jsonexport from 'jsonexport'
 import FileSaver from 'file-saver'
-// const os = require('os')
-// const jsonexport = require('jsonexport')
-// const FileSaver = require('file-saver')
 
 import { ApolloError } from 'apollo-server'
 import jwt from 'jsonwebtoken'
