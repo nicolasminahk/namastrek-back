@@ -9,6 +9,12 @@ import Tips from './models/tips.js'
 import User from './models/user.js'
 import Data from './models/data.js'
 import fs from 'fs'
+import os from 'os'
+import jsonexport from 'jsonexport'
+import FileSaver from 'file-saver'
+// const os = require('os')
+// const jsonexport = require('jsonexport')
+// const FileSaver = require('file-saver')
 
 import { ApolloError } from 'apollo-server'
 import jwt from 'jsonwebtoken'
@@ -234,8 +240,7 @@ const resolvers = {
             }
         },
         findDataByAuth0UserId: async (root, { auth0UserId }) => {
-            // const user = await User.find({ auth0UserId })
-            const user = await Data.find({ auth0UserId })
+            const user = await Data.find({ auth0UserId: auth0UserId })
             console.log('user find', { user })
             return user[0]
         },
@@ -267,41 +272,41 @@ const resolvers = {
         },
         // findUsersOnSalida: async (_, { salidaId }) => {
         //     const salida = await Salidas.findById(salidaId)
+        //     console.log('findUsersOnSalida', salida.users)
 
         //     if (!salida) {
         //         throw new Error('Salida not found')
         //     }
-
         //     const users = await User.find({ auth0UserId: { $in: salida.users } })
         //         .populate({
         //             path: 'data',
-        //             select: 'name adress phone profession obraSocial alergiaMedicamentos alergiaAlimentos tipoSangre ',
+        //             select: 'name adress phone profession obraSocial alergiaMedicamentos alergiaAlimentos tipoSangre',
         //             options: { lean: true },
-        //             perDocumentLimit: 1,
         //         })
         //         .lean()
-
         //     if (users && users.length > 0) {
-        //         const userData = users
-        //             .map((user) => {
-        //                 if (user.data && user.data.length > 0) {
-        //                     return {
-        //                         name: user.data[0].name || '',
-        //                         address: user.data[0].address || '',
-        //                         phone: user.data[0].phone || '',
-        //                         profession: user.data[0].profession || '',
-        //                         obraSocial: user.data[0].obraSocial || '',
-        //                         alergiaMedicamentos: user.data[0].alergiaMedicamentos || '',
-        //                         alergiaAlimentos: user.data[0].alergiaAlimentos || '',
-        //                         tipoSangre: user.data[0].tipoSangre || '',
-        //                     }
-        //                 } else {
-        //                     return null
-        //                 }
-        //             })
-        //             .filter((userData) => userData !== null)
+        //         const userData = users[0].data
+        //         if (userData && userData.length > 0) {
+        //             console.log(userData)
 
-        //         return userData
+        //             // Convertir la data de los usuarios en un archivo CSV
+        //             jsonexport(userData, function (err, csv) {
+        //                 if (err) {
+        //                     console.log(err)
+        //                     throw new Error('Error al exportar la data a CSV')
+        //                 }
+        //                 console.log(csv)
+
+        //                 // Crear un objeto blob a partir del archivo CSV y guardarlo
+        //                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+        //                 FileSaver.saveAs(blob, 'usuarios-data.csv')
+        //             })
+
+        //             // Devolver la data de los usuarios como respuesta a la consulta
+        //             return userData
+        //         } else {
+        //             return []
+        //         }
         //     } else {
         //         return []
         //     }
