@@ -129,7 +129,7 @@ const typeDefs = gql`
         addPersonExit(salida: String!, auth0UserId: String!): Salidas
         addPersonBenefit(benefit: String!, auth0UserId: String!): User
         createUser(id: String!, email: String!): User
-        addDataToUser(data: DataInput!, auth0UserId: String!): User
+        addDataToUser(data: DataInput!, auth0UserId: String!): Data!
         removePersonExit(salida: String!, auth0UserId: String!): Salidas
     }
 
@@ -531,7 +531,7 @@ const resolvers = {
             user.data.push(newData)
             await user.save()
 
-            return user
+            return newData
         },
         //Debería haber un create data antes de sumarlo al usuario
         //Add Data of Person, osea crear un tabla de data con sus datos y vincularlos a una persona
