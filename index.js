@@ -14,7 +14,6 @@ import fs from 'fs'
 // import FileSaver from 'file-saver'
 // const fs = require('fs')
 import Parser from 'json-2-csv'
-// const { Parser } = require('json2csv')
 import { ApolloError } from 'apollo-server'
 import jwt from 'jsonwebtoken'
 import jwt_decode from 'jwt-decode'
