@@ -296,7 +296,7 @@ const resolvers = {
             const filename = `users-on-salida-${salidaId}.csv`
             const path = `./${filename}`
 
-            fs.writeFileSync(path, csv)
+            fs.writeFileSync(path, csv, 'utf-8')
 
             return {
                 filename,
@@ -304,7 +304,6 @@ const resolvers = {
                 mimetype: 'text/csv',
             }
         },
-
         // findUsersOnSalida: async (_, { salidaId }) => {
         //     const salida = await Salidas.findById(salidaId)
         //     console.log('findUsersOnSalida', salida.users)
