@@ -8,11 +8,13 @@ import Beneficios from './models/beneficios.js'
 import Tips from './models/tips.js'
 import User from './models/user.js'
 import Data from './models/data.js'
-// import fs from 'fs'
+import fs from 'fs'
 // import os from 'os'
 // import jsonexport from 'jsonexport'
 // import FileSaver from 'file-saver'
-
+// const fs = require('fs')
+import Parser from 'json-2-csv'
+// const { Parser } = require('json2csv')
 import { ApolloError } from 'apollo-server'
 import jwt from 'jsonwebtoken'
 import jwt_decode from 'jwt-decode'
@@ -47,6 +49,8 @@ const typeDefs = gql`
         alergiaAlimentos: String
         tipoSangre: String
         email: String
+        fechaDeNacimiento: String
+        dni: String
         auth0UserId: String!
     }
 
@@ -105,6 +109,7 @@ const typeDefs = gql`
         protectedQuery(id: ID!): User
         findSalidasByAuth0UserId(auth0UserId: String!): [Salidas!]!
         findUsersOnSalida(salidaId: String!): [Data!]!
+        findUsersOnSalidaInExcel(salidaId: String!): [Data!]!
         findDataByAuth0UserId(auth0UserId: String!): Data!
         findBenefitByAuth0UserId(auth0UserId: String!): [Beneficios!]!
     }
@@ -143,6 +148,8 @@ const typeDefs = gql`
         alergiaAlimentos: String
         tipoSangre: String
         email: String
+        dni: String
+        fechaDeNacimiento: String
         auth0UserId: String
     }
 `
@@ -251,7 +258,7 @@ const resolvers = {
             const users = await User.find({ auth0UserId: { $in: salida.users } })
                 .populate({
                     path: 'data',
-                    select: 'name adress phone profession obraSocial alergiaMedicamentos alergiaAlimentos tipoSangre ',
+                    select: 'name adress phone profession obraSocial alergiaMedicamentos alergiaAlimentos tipoSangre fechaDeNacimiento dni  ',
                     options: { lean: true },
                 })
                 .lean()
@@ -267,6 +274,38 @@ const resolvers = {
                 return []
             }
         },
+
+        findUsersOnSalidaInExcel: async (_, { salidaId }) => {
+            const salida = await Salidas.findById(salidaId)
+
+            if (!salida) {
+                throw new Error('Salida not found')
+            }
+
+            const users = await User.find({ auth0UserId: { $in: salida.users } })
+                .select('name fechaDeNacimiento dni')
+                .lean()
+
+            if (!users || users.length === 0) {
+                throw new Error('No users found on this salida')
+            }
+
+            const fields = ['name', 'fechaDeNacimiento', 'dni']
+            const json2csvParser = new Parser({ fields })
+            const csv = json2csvParser.parse(users)
+
+            const filename = `users-on-salida-${salidaId}.csv`
+            const path = `./${filename}`
+
+            fs.writeFileSync(path, csv)
+
+            return {
+                filename,
+                path,
+                mimetype: 'text/csv',
+            }
+        },
+
         // findUsersOnSalida: async (_, { salidaId }) => {
         //     const salida = await Salidas.findById(salidaId)
         //     console.log('findUsersOnSalida', salida.users)
