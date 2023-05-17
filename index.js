@@ -8,8 +8,8 @@ import Beneficios from './models/beneficios.js'
 import Tips from './models/tips.js'
 import User from './models/user.js'
 import Data from './models/data.js'
-import ExcelJS from 'exceljs'
-import fs from 'fs'
+// import ExcelJS from 'exceljs'
+// import fs from 'fs'
 import { ApolloError } from 'apollo-server'
 import jwt from 'jsonwebtoken'
 import jwt_decode from 'jwt-decode'
@@ -283,62 +283,6 @@ const resolvers = {
                 return []
             }
         },
-        findUsersOnSalidaInExcel: async (_, { salidaId }) => {
-            const salida = await Salidas.findById(salidaId)
-
-            if (!salida) {
-                throw new Error('Salida not found')
-            }
-
-            const auth0UserIds = salida.users // Obtener los auth0UserIds de la salida
-
-            const users = await User.find({ auth0UserId: { $in: auth0UserIds } }) // Buscar los usuarios por auth0UserIds
-                .populate('data') // Poblar el campo 'data' en el resultado
-                .select('data') // Seleccionar solo el campo 'data'
-                .lean()
-
-            if (!users || users.length === 0) {
-                throw new Error('No users found on this salida')
-            }
-
-            const workbook = new ExcelJS.Workbook()
-            const worksheet = workbook.addWorksheet('Users')
-
-            // Define las cabeceras del archivo de Excel
-            worksheet.columns = [
-                { header: 'Name', key: 'name', width: 20 },
-                { header: 'Fecha de Nacimiento', key: 'fechaDeNacimiento', width: 20 },
-                { header: 'DNI', key: 'dni', width: 15 },
-            ]
-
-            // Agrega los datos de los usuarios al archivo de Excel
-            users.forEach((user) => {
-                const userData = user.data
-                worksheet.addRow({
-                    name: userData.name,
-                    fechaDeNacimiento: userData.fechaDeNacimiento,
-                    dni: userData.dni,
-                })
-            })
-
-            // Genera el archivo de Excel en formato buffer
-            const buffer = await workbook.xlsx.writeBuffer()
-
-            const filename = `users-on-salida-${salidaId}.xlsx`
-            const path = `./${filename}`
-
-            // Guarda el archivo de Excel en el servidor
-            fs.writeFileSync(path, buffer, 'utf-8')
-
-            return [
-                {
-                    filename,
-                    path,
-                    mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                },
-            ]
-        },
-
         // findUsersOnSalidaInExcel: async (_, { salidaId }) => {
         //     const salida = await Salidas.findById(salidaId)
 
@@ -346,8 +290,11 @@ const resolvers = {
         //         throw new Error('Salida not found')
         //     }
 
-        //     const users = await User.find({ auth0UserId: { $in: salida.users } })
-        //         .select('name fechaDeNacimiento dni')
+        //     const auth0UserIds = salida.users // Obtener los auth0UserIds de la salida
+
+        //     const users = await User.find({ auth0UserId: { $in: auth0UserIds } }) // Buscar los usuarios por auth0UserIds
+        //         .populate('data') // Poblar el campo 'data' en el resultado
+        //         .select('data') // Seleccionar solo el campo 'data'
         //         .lean()
 
         //     if (!users || users.length === 0) {
@@ -366,7 +313,12 @@ const resolvers = {
 
         //     // Agrega los datos de los usuarios al archivo de Excel
         //     users.forEach((user) => {
-        //         worksheet.addRow(user)
+        //         const userData = user.data
+        //         worksheet.addRow({
+        //             name: userData.name,
+        //             fechaDeNacimiento: userData.fechaDeNacimiento,
+        //             dni: userData.dni,
+        //         })
         //     })
 
         //     // Genera el archivo de Excel en formato buffer
@@ -378,52 +330,13 @@ const resolvers = {
         //     // Guarda el archivo de Excel en el servidor
         //     fs.writeFileSync(path, buffer, 'utf-8')
 
-        //     return {
-        //         filename,
-        //         path,
-        //         mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        //     }
-        // },
-        // findUsersOnSalida: async (_, { salidaId }) => {
-        //     const salida = await Salidas.findById(salidaId)
-        //     console.log('findUsersOnSalida', salida.users)
-
-        //     if (!salida) {
-        //         throw new Error('Salida not found')
-        //     }
-        //     const users = await User.find({ auth0UserId: { $in: salida.users } })
-        //         .populate({
-        //             path: 'data',
-        //             select: 'name adress phone profession obraSocial alergiaMedicamentos alergiaAlimentos tipoSangre',
-        //             options: { lean: true },
-        //         })
-        //         .lean()
-        //     if (users && users.length > 0) {
-        //         const userData = users[0].data
-        //         if (userData && userData.length > 0) {
-        //             console.log(userData)
-
-        //             // Convertir la data de los usuarios en un archivo CSV
-        //             jsonexport(userData, function (err, csv) {
-        //                 if (err) {
-        //                     console.log(err)
-        //                     throw new Error('Error al exportar la data a CSV')
-        //                 }
-        //                 console.log(csv)
-
-        //                 // Crear un objeto blob a partir del archivo CSV y guardarlo
-        //                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-        //                 FileSaver.saveAs(blob, 'usuarios-data.csv')
-        //             })
-
-        //             // Devolver la data de los usuarios como respuesta a la consulta
-        //             return userData
-        //         } else {
-        //             return []
-        //         }
-        //     } else {
-        //         return []
-        //     }
+        //     return [
+        //         {
+        //             filename,
+        //             path,
+        //             mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        //         },
+        //     ]
         // },
     },
     Mutation: {
