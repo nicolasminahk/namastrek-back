@@ -26,8 +26,8 @@ const schema = mongoose.Schema(
         duration: {
             type: String,
         },
-
         users: [{ type: String, ref: 'User' }],
+        usersConfirm: [{ type: String, ref: 'User' }],
     },
     { timestamps: true }
 )
