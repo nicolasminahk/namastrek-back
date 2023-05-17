@@ -8,12 +8,8 @@ import Beneficios from './models/beneficios.js'
 import Tips from './models/tips.js'
 import User from './models/user.js'
 import Data from './models/data.js'
-// import fs from 'fs'
-// import os from 'os'
-// import jsonexport from 'jsonexport'
-// import FileSaver from 'file-saver'
-// const fs = require('fs')
-// import Parser from 'json-2-csv'
+import ExcelJS from 'exceljs'
+import fs from 'fs'
 import { ApolloError } from 'apollo-server'
 import jwt from 'jsonwebtoken'
 import jwt_decode from 'jwt-decode'
@@ -60,6 +56,7 @@ const typeDefs = gql`
         token: String
         isAdmin: Boolean
         salidas: [String!]!
+        salidasConfirm: [String!]!
         beneficios: [String!]!
         data: [Data!]
         auth0UserId: String!
@@ -75,6 +72,7 @@ const typeDefs = gql`
         image: String
         duration: String!
         users: [String!]!
+        usersConfirm: [String!]!
         createdAt: String
         updateAt: String
     }
@@ -135,6 +133,7 @@ const typeDefs = gql`
         createUser(id: String!, email: String!): User
         addDataToUser(data: DataInput!, auth0UserId: String!): Data!
         removePersonExit(salida: String!, auth0UserId: String!): Salidas
+        confirmUsers(salidaId: ID!, auth0UserIds: [String!]!): [UserConfirmation!]!
     }
 
     input DataInput {
@@ -150,6 +149,17 @@ const typeDefs = gql`
         dni: String
         fechaDeNacimiento: String
         auth0UserId: String
+    }
+
+    type UserConfirmation {
+        user: User!
+        data: UserData!
+    }
+
+    type UserData {
+        name: String!
+        fechaDeNacimiento: String!
+        dni: String!
     }
 `
 
@@ -273,6 +283,61 @@ const resolvers = {
                 return []
             }
         },
+        findUsersOnSalidaInExcel: async (_, { salidaId }) => {
+            const salida = await Salidas.findById(salidaId)
+
+            if (!salida) {
+                throw new Error('Salida not found')
+            }
+
+            const auth0UserIds = salida.users // Obtener los auth0UserIds de la salida
+
+            const users = await User.find({ auth0UserId: { $in: auth0UserIds } }) // Buscar los usuarios por auth0UserIds
+                .populate('data') // Poblar el campo 'data' en el resultado
+                .select('data') // Seleccionar solo el campo 'data'
+                .lean()
+
+            if (!users || users.length === 0) {
+                throw new Error('No users found on this salida')
+            }
+
+            const workbook = new ExcelJS.Workbook()
+            const worksheet = workbook.addWorksheet('Users')
+
+            // Define las cabeceras del archivo de Excel
+            worksheet.columns = [
+                { header: 'Name', key: 'name', width: 20 },
+                { header: 'Fecha de Nacimiento', key: 'fechaDeNacimiento', width: 20 },
+                { header: 'DNI', key: 'dni', width: 15 },
+            ]
+
+            // Agrega los datos de los usuarios al archivo de Excel
+            users.forEach((user) => {
+                const userData = user.data
+                worksheet.addRow({
+                    name: userData.name,
+                    fechaDeNacimiento: userData.fechaDeNacimiento,
+                    dni: userData.dni,
+                })
+            })
+
+            // Genera el archivo de Excel en formato buffer
+            const buffer = await workbook.xlsx.writeBuffer()
+
+            const filename = `users-on-salida-${salidaId}.xlsx`
+            const path = `./${filename}`
+
+            // Guarda el archivo de Excel en el servidor
+            fs.writeFileSync(path, buffer, 'utf-8')
+
+            return [
+                {
+                    filename,
+                    path,
+                    mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                },
+            ]
+        },
 
         // findUsersOnSalidaInExcel: async (_, { salidaId }) => {
         //     const salida = await Salidas.findById(salidaId)
@@ -289,19 +354,34 @@ const resolvers = {
         //         throw new Error('No users found on this salida')
         //     }
 
-        //     const fields = ['name', 'fechaDeNacimiento', 'dni']
-        //     const json2csvParser = new Parser({ fields })
-        //     const csv = json2csvParser.parse(users)
+        //     const workbook = new ExcelJS.Workbook()
+        //     const worksheet = workbook.addWorksheet('Users')
 
-        //     const filename = `users-on-salida-${salidaId}.csv`
+        //     // Define las cabeceras del archivo de Excel
+        //     worksheet.columns = [
+        //         { header: 'Name', key: 'name', width: 20 },
+        //         { header: 'Fecha de Nacimiento', key: 'fechaDeNacimiento', width: 20 },
+        //         { header: 'DNI', key: 'dni', width: 15 },
+        //     ]
+
+        //     // Agrega los datos de los usuarios al archivo de Excel
+        //     users.forEach((user) => {
+        //         worksheet.addRow(user)
+        //     })
+
+        //     // Genera el archivo de Excel en formato buffer
+        //     const buffer = await workbook.xlsx.writeBuffer()
+
+        //     const filename = `users-on-salida-${salidaId}.xlsx`
         //     const path = `./${filename}`
 
-        //     fs.writeFileSync(path, csv, 'utf-8')
+        //     // Guarda el archivo de Excel en el servidor
+        //     fs.writeFileSync(path, buffer, 'utf-8')
 
         //     return {
         //         filename,
         //         path,
-        //         mimetype: 'text/csv',
+        //         mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         //     }
         // },
         // findUsersOnSalida: async (_, { salidaId }) => {
@@ -476,6 +556,86 @@ const resolvers = {
 
             return updatedSalida
         },
+        confirmUsers: async (_, { salidaId, auth0UserIds }) => {
+            const salida = await Salidas.findById(salidaId)
+
+            if (!salida) {
+                throw new Error('Salida not found')
+            }
+
+            const uniqueAuth0UserIds = [] // Arreglo auxiliar para almacenar los auth0UserIds únicos
+
+            const confirmedUsers = await User.find({ auth0UserId: { $in: auth0UserIds } })
+                .populate('data', 'name fechaDeNacimiento dni')
+                .lean()
+
+            if (!confirmedUsers || confirmedUsers.length === 0) {
+                throw new Error('No confirmed users found')
+            }
+
+            const userConfirmations = confirmedUsers.reduce((acc, user) => {
+                // Filtrar los auth0UserIds repetidos en el arreglo de usuarios confirmados
+                if (!uniqueAuth0UserIds.includes(user.auth0UserId)) {
+                    uniqueAuth0UserIds.push(user.auth0UserId)
+                    acc.push({
+                        user,
+                        data: {
+                            name: user.data.name,
+                            fechaDeNacimiento: user.data.fechaDeNacimiento,
+                            dni: user.data.dni,
+                        },
+                    })
+
+                    // Hacer push del id de la salida al arreglo de salidasConfirm en el usuario
+                    User.findByIdAndUpdate(user._id, { $push: { salidasConfirm: salidaId } }).exec()
+                }
+                return acc
+            }, [])
+
+            // Hacer push del id de la salida al arreglo de usersConfirm en la salida
+            salida.usersConfirm.push(...uniqueAuth0UserIds)
+            await salida.save()
+
+            return userConfirmations
+        },
+
+        // confirmUsers: async (_, { salidaId, auth0UserIds }) => {
+        //     const salida = await Salidas.findById(salidaId)
+
+        //     if (!salida) {
+        //         throw new Error('Salida not found')
+        //     }
+
+        //     const uniqueAuth0UserIds = [] // Arreglo auxiliar para almacenar los auth0UserIds únicos
+
+        //     const confirmedUsers = await User.find({ auth0UserId: { $in: auth0UserIds } })
+        //         .populate('data', 'name fechaDeNacimiento dni')
+        //         .lean()
+
+        //     if (!confirmedUsers || confirmedUsers.length === 0) {
+        //         throw new Error('No confirmed users found')
+        //     }
+
+        //     const userConfirmations = confirmedUsers.reduce((acc, user) => {
+        //         // Filtrar los auth0UserIds repetidos en el arreglo de usuarios confirmados
+        //         if (!uniqueAuth0UserIds.includes(user.auth0UserId)) {
+        //             uniqueAuth0UserIds.push(user.auth0UserId)
+        //             acc.push({
+        //                 user,
+        //                 data: {
+        //                     name: user.data.name,
+        //                     fechaDeNacimiento: user.data.fechaDeNacimiento,
+        //                     dni: user.data.dni,
+        //                 },
+        //             })
+        //         }
+        //         return acc
+        //     }, [])
+
+        //     User.salidasConfirm.push(salidaId)
+
+        //     return userConfirmations
+        // },
 
         // addPersonBenefit: async (root, { benefit, auth0UserId }) => {
         //     // Busca la salida por su id
