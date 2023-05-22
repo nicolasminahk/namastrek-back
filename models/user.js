@@ -11,7 +11,6 @@ const schema = mongoose.Schema({
     data: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Data' }],
     salidas: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Salidas' }],
     salidasConfirm: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Salidas' }],
-
     beneficios: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Beneficios' }],
 })
 schema.plugin(uniqueValidator)

@@ -71,6 +71,7 @@ const typeDefs = gql`
         price: String!
         image: String
         duration: String!
+        linkImage: String
         users: [String!]!
         usersConfirm: [String!]!
         createdAt: String
@@ -121,6 +122,7 @@ const typeDefs = gql`
             price: String!
             image: String!
             duration: String!
+            linkImage: String!
         ): Salidas
         addBeneficios(name: String!, description: String!, date: String!): Beneficios
         editNumber(name: String!, phone: String!): Person
@@ -157,9 +159,9 @@ const typeDefs = gql`
     }
 
     type UserData {
-        name: String!
-        fechaDeNacimiento: String!
-        dni: String!
+        name: String
+        fechaDeNacimiento: String
+        dni: String
     }
 `
 
@@ -290,7 +292,7 @@ const resolvers = {
         //         throw new Error('Salida not found')
         //     }
 
-        //     const auth0UserIds = salida.users // Obtener los auth0UserIds de la salida
+        //     const auth0UserIds = salida.usersConfirm // Obtener los auth0UserIds de la salida
 
         //     const users = await User.find({ auth0UserId: { $in: auth0UserIds } }) // Buscar los usuarios por auth0UserIds
         //         .populate('data') // Poblar el campo 'data' en el resultado
@@ -354,7 +356,7 @@ const resolvers = {
             return await newUser.save()
         },
         addSalidas: async (root, args) => {
-            const { name, description, date, price, duration, image } = args
+            const { name, description, date, price, duration, image, linkImage } = args
             console.log({ args })
             const imageBuffer = Buffer.from(image, 'base64')
             const imageBase64 = imageBuffer.toString('base64')
@@ -364,6 +366,7 @@ const resolvers = {
                 date,
                 price,
                 duration,
+                linkImage,
                 image: imageBase64,
             })
             return await salidas.save()
@@ -479,8 +482,9 @@ const resolvers = {
             const uniqueAuth0UserIds = [] // Arreglo auxiliar para almacenar los auth0UserIds únicos
 
             const confirmedUsers = await User.find({ auth0UserId: { $in: auth0UserIds } })
+                .select('email salidasConfirm data')
                 .populate('data', 'name fechaDeNacimiento dni')
-                .lean()
+                .exec()
 
             if (!confirmedUsers || confirmedUsers.length === 0) {
                 throw new Error('No confirmed users found')
@@ -491,7 +495,10 @@ const resolvers = {
                 if (!uniqueAuth0UserIds.includes(user.auth0UserId)) {
                     uniqueAuth0UserIds.push(user.auth0UserId)
                     acc.push({
-                        user,
+                        user: {
+                            email: user.email,
+                            salidasConfirm: user.salidasConfirm,
+                        },
                         data: {
                             name: user.data.name,
                             fechaDeNacimiento: user.data.fechaDeNacimiento,
@@ -500,17 +507,60 @@ const resolvers = {
                     })
 
                     // Hacer push del id de la salida al arreglo de salidasConfirm en el usuario
-                    User.findByIdAndUpdate(user._id, { $push: { salidasConfirm: salidaId } }).exec()
+                    User.findByIdAndUpdate(user._id, { $addToSet: { salidasConfirm: salidaId } }).exec()
                 }
+                console.log(acc)
                 return acc
             }, [])
 
             // Hacer push del id de la salida al arreglo de usersConfirm en la salida
-            salida.usersConfirm.push(...uniqueAuth0UserIds)
+            salida.usersConfirm = [...new Set([...salida.usersConfirm, ...uniqueAuth0UserIds])]
             await salida.save()
-
             return userConfirmations
         },
+
+        // confirmUsers: async (_, { salidaId, auth0UserIds }) => {
+        //     const salida = await Salidas.findById(salidaId)
+
+        //     if (!salida) {
+        //         throw new Error('Salida not found')
+        //     }
+
+        //     const uniqueAuth0UserIds = [] // Arreglo auxiliar para almacenar los auth0UserIds únicos
+
+        //     const confirmedUsers = await User.find({ auth0UserId: { $in: auth0UserIds } })
+        //         .populate('data', 'name fechaDeNacimiento dni')
+        //         .lean()
+
+        //     if (!confirmedUsers || confirmedUsers.length === 0) {
+        //         throw new Error('No confirmed users found')
+        //     }
+
+        //     const userConfirmations = confirmedUsers.reduce((acc, user) => {
+        //         // Filtrar los auth0UserIds repetidos en el arreglo de usuarios confirmados
+        //         if (!uniqueAuth0UserIds.includes(user.auth0UserId)) {
+        //             uniqueAuth0UserIds.push(user.auth0UserId)
+        //             acc.push({
+        //                 user,
+        //                 data: {
+        //                     name: user.data.name,
+        //                     fechaDeNacimiento: user.data.fechaDeNacimiento,
+        //                     dni: user.data.dni,
+        //                 },
+        //             })
+
+        //             // Hacer push del id de la salida al arreglo de salidasConfirm en el usuario
+        //             User.findByIdAndUpdate(user._id, { $push: { salidasConfirm: salidaId } }).exec()
+        //         }
+        //         return acc
+        //     }, [])
+
+        //     // Hacer push del id de la salida al arreglo de usersConfirm en la salida
+        //     salida.usersConfirm.push(...uniqueAuth0UserIds)
+        //     await salida.save()
+
+        //     return userConfirmations
+        // },
 
         // confirmUsers: async (_, { salidaId, auth0UserIds }) => {
         //     const salida = await Salidas.findById(salidaId)

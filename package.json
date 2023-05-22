@@ -18,13 +18,17 @@
         "apollo-server": "^3.11.1",
         "axios": "^1.2.2",
         "bcryptjs": "^2.4.3",
+        "exceljs": "^4.3.0",
+        "file-saver": "^2.0.5",
         "graphql": "^16.6.0",
         "graphql-upload": "^16.0.2",
         "json-server": "^0.17.1",
+        "jsonexport": "^3.2.0",
         "jsonwebtoken": "^9.0.0",
         "jwt-decode": "^3.1.2",
         "mongoose": "^6.8.3",
         "mongoose-unique-validator": "^3.1.0",
+        "os": "^0.1.2",
         "uuid": "^9.0.0"
     }
 }

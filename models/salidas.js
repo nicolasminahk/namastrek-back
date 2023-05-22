@@ -26,6 +26,10 @@ const schema = mongoose.Schema(
         duration: {
             type: String,
         },
+        linkImage: {
+            type: String,
+        },
+
         users: [{ type: String, ref: 'User' }],
         usersConfirm: [{ type: String, ref: 'User' }],
     },
