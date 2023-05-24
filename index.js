@@ -8,8 +8,8 @@ import Beneficios from './models/beneficios.js'
 import Tips from './models/tips.js'
 import User from './models/user.js'
 import Data from './models/data.js'
-// import ExcelJS from 'exceljs'
-// import fs from 'fs'
+import ExcelJS from 'exceljs'
+import fs from 'fs'
 import { ApolloError } from 'apollo-server'
 import jwt from 'jsonwebtoken'
 import jwt_decode from 'jwt-decode'
@@ -285,6 +285,61 @@ const resolvers = {
                 return []
             }
         },
+        findUsersOnSalidaInExcel: async (_, { salidaId }) => {
+            const salida = await Salidas.findById(salidaId)
+
+            if (!salida) {
+                throw new Error('Salida not found')
+            }
+
+            const auth0UserIds = salida.usersConfirm
+
+            const users = await User.find({ auth0UserId: { $in: auth0UserIds } })
+                .populate({
+                    path: 'data',
+                    select: 'name fechaDeNacimiento dni',
+                    options: { lean: true }, // Añadimos la opción lean: true para obtener documentos sin mongoose wrapper
+                })
+                .lean()
+
+            if (!users || users.length === 0) {
+                throw new Error('No users found on this salida')
+            }
+            console.log(users)
+            const workbook = new ExcelJS.Workbook()
+            const worksheet = workbook.addWorksheet('Users')
+
+            worksheet.columns = [
+                { header: 'Name', key: 'name', width: 20 },
+                { header: 'Fecha de Nacimiento', key: 'fechaDeNacimiento', width: 20 },
+                { header: 'DNI', key: 'dni', width: 15 },
+            ]
+
+            users.forEach((user) => {
+                const userData = user.data[0] // Accedemos al primer elemento del arreglo data
+                worksheet.addRow({
+                    name: userData.name,
+                    fechaDeNacimiento: userData.fechaDeNacimiento,
+                    dni: userData.dni,
+                })
+            })
+
+            const buffer = await workbook.xlsx.writeBuffer()
+
+            const filename = `users-on-salida-${salidaId}.xlsx`
+            const path = `./${filename}`
+
+            fs.writeFileSync(path, buffer, 'utf-8')
+
+            return [
+                {
+                    filename,
+                    path,
+                    mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                },
+            ]
+        },
+
         // findUsersOnSalidaInExcel: async (_, { salidaId }) => {
         //     const salida = await Salidas.findById(salidaId)
 
@@ -302,7 +357,7 @@ const resolvers = {
         //     if (!users || users.length === 0) {
         //         throw new Error('No users found on this salida')
         //     }
-
+        //     console.log(users)
         //     const workbook = new ExcelJS.Workbook()
         //     const worksheet = workbook.addWorksheet('Users')
 
