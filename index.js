@@ -14,6 +14,8 @@ import { ApolloError } from 'apollo-server'
 import jwt from 'jsonwebtoken'
 import jwt_decode from 'jwt-decode'
 import mongoose from 'mongoose'
+import path from 'path'
+import os from 'os'
 
 const typeDefs = gql`
     scalar Upload
@@ -107,7 +109,7 @@ const typeDefs = gql`
         protectedQuery(id: ID!): User
         findSalidasByAuth0UserId(auth0UserId: String!): [Salidas!]!
         findUsersOnSalida(salidaId: String!): [Data!]!
-        findUsersOnSalidaInExcel(salidaId: String!): [Data!]!
+
         findDataByAuth0UserId(auth0UserId: String!): Data!
         findBenefitByAuth0UserId(auth0UserId: String!): [Beneficios!]!
     }
@@ -136,6 +138,7 @@ const typeDefs = gql`
         addDataToUser(data: DataInput!, auth0UserId: String!): Data!
         removePersonExit(salida: String!, auth0UserId: String!): Salidas
         confirmUsers(salidaId: ID!, auth0UserIds: [String!]!): [UserConfirmation!]!
+        findUsersOnSalidaInExcel(salidaId: String!): ExcelFile
     }
 
     input DataInput {
@@ -162,6 +165,11 @@ const typeDefs = gql`
         name: String
         fechaDeNacimiento: String
         dni: String
+    }
+    type ExcelFile {
+        filename: String!
+        buffer: String!
+        mimetype: String!
     }
 `
 
@@ -285,116 +293,6 @@ const resolvers = {
                 return []
             }
         },
-        findUsersOnSalidaInExcel: async (_, { salidaId }) => {
-            const salida = await Salidas.findById(salidaId)
-
-            if (!salida) {
-                throw new Error('Salida not found')
-            }
-
-            const auth0UserIds = salida.usersConfirm
-
-            const users = await User.find({ auth0UserId: { $in: auth0UserIds } })
-                .populate({
-                    path: 'data',
-                    select: 'name fechaDeNacimiento dni',
-                    options: { lean: true }, // Añadimos la opción lean: true para obtener documentos sin mongoose wrapper
-                })
-                .lean()
-
-            if (!users || users.length === 0) {
-                throw new Error('No users found on this salida')
-            }
-            console.log(users)
-            const workbook = new ExcelJS.Workbook()
-            const worksheet = workbook.addWorksheet('Users')
-
-            worksheet.columns = [
-                { header: 'Name', key: 'name', width: 20 },
-                { header: 'Fecha de Nacimiento', key: 'fechaDeNacimiento', width: 20 },
-                { header: 'DNI', key: 'dni', width: 15 },
-            ]
-
-            users.forEach((user) => {
-                const userData = user.data[0] // Accedemos al primer elemento del arreglo data
-                worksheet.addRow({
-                    name: userData.name,
-                    fechaDeNacimiento: userData.fechaDeNacimiento,
-                    dni: userData.dni,
-                })
-            })
-
-            const buffer = await workbook.xlsx.writeBuffer()
-
-            const filename = `users-on-salida-${salidaId}.xlsx`
-            const path = `./${filename}`
-
-            fs.writeFileSync(path, buffer, 'utf-8')
-
-            return [
-                {
-                    filename,
-                    path,
-                    mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                },
-            ]
-        },
-
-        // findUsersOnSalidaInExcel: async (_, { salidaId }) => {
-        //     const salida = await Salidas.findById(salidaId)
-
-        //     if (!salida) {
-        //         throw new Error('Salida not found')
-        //     }
-
-        //     const auth0UserIds = salida.usersConfirm // Obtener los auth0UserIds de la salida
-
-        //     const users = await User.find({ auth0UserId: { $in: auth0UserIds } }) // Buscar los usuarios por auth0UserIds
-        //         .populate('data') // Poblar el campo 'data' en el resultado
-        //         .select('data') // Seleccionar solo el campo 'data'
-        //         .lean()
-
-        //     if (!users || users.length === 0) {
-        //         throw new Error('No users found on this salida')
-        //     }
-        //     console.log(users)
-        //     const workbook = new ExcelJS.Workbook()
-        //     const worksheet = workbook.addWorksheet('Users')
-
-        //     // Define las cabeceras del archivo de Excel
-        //     worksheet.columns = [
-        //         { header: 'Name', key: 'name', width: 20 },
-        //         { header: 'Fecha de Nacimiento', key: 'fechaDeNacimiento', width: 20 },
-        //         { header: 'DNI', key: 'dni', width: 15 },
-        //     ]
-
-        //     // Agrega los datos de los usuarios al archivo de Excel
-        //     users.forEach((user) => {
-        //         const userData = user.data
-        //         worksheet.addRow({
-        //             name: userData.name,
-        //             fechaDeNacimiento: userData.fechaDeNacimiento,
-        //             dni: userData.dni,
-        //         })
-        //     })
-
-        //     // Genera el archivo de Excel en formato buffer
-        //     const buffer = await workbook.xlsx.writeBuffer()
-
-        //     const filename = `users-on-salida-${salidaId}.xlsx`
-        //     const path = `./${filename}`
-
-        //     // Guarda el archivo de Excel en el servidor
-        //     fs.writeFileSync(path, buffer, 'utf-8')
-
-        //     return [
-        //         {
-        //             filename,
-        //             path,
-        //             mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        //         },
-        //     ]
-        // },
     },
     Mutation: {
         addPerson: (root, args) => {
@@ -573,6 +471,116 @@ const resolvers = {
             await salida.save()
             return userConfirmations
         },
+        findUsersOnSalidaInExcel: async (_, { salidaId }) => {
+            const salida = await Salidas.findById(salidaId)
+
+            if (!salida) {
+                throw new Error('Salida not found')
+            }
+
+            const auth0UserIds = salida.usersConfirm
+
+            const users = await User.find({ auth0UserId: { $in: auth0UserIds } })
+                .populate({
+                    path: 'data',
+                    select: 'name fechaDeNacimiento dni',
+                    options: { lean: true },
+                })
+                .lean()
+
+            if (!users || users.length === 0) {
+                throw new Error('No users found on this salida')
+            }
+
+            const workbook = new ExcelJS.Workbook()
+            const worksheet = workbook.addWorksheet('Users')
+
+            worksheet.columns = [
+                { header: 'Name', key: 'name', width: 20 },
+                { header: 'Fecha de Nacimiento', key: 'fechaDeNacimiento', width: 20 },
+                { header: 'DNI', key: 'dni', width: 15 },
+            ]
+
+            users.forEach((user) => {
+                const userData = user.data[0]
+                worksheet.addRow({
+                    name: userData.name,
+                    fechaDeNacimiento: userData.fechaDeNacimiento,
+                    dni: userData.dni,
+                })
+            })
+
+            const tempFilePath = path.join(os.tmpdir(), `users-on-salida-${salidaId}.xlsx`)
+
+            await workbook.xlsx.writeFile(tempFilePath)
+
+            const fileData = fs.readFileSync(tempFilePath)
+            const bufferBase64 = fileData.toString('base64')
+
+            const filename = `users-on-salida-${salidaId}.xlsx`
+            const mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+            return {
+                filename,
+                buffer: bufferBase64,
+                mimetype,
+            }
+        },
+
+        // findUsersOnSalidaInExcel: async (_, { salidaId }) => {
+        //     const salida = await Salidas.findById(salidaId)
+
+        //     if (!salida) {
+        //         throw new Error('Salida not found')
+        //     }
+
+        //     const auth0UserIds = salida.usersConfirm
+
+        //     const users = await User.find({ auth0UserId: { $in: auth0UserIds } })
+        //         .populate({
+        //             path: 'data',
+        //             select: 'name fechaDeNacimiento dni',
+        //             options: { lean: true }, // Añadimos la opción lean: true para obtener documentos sin mongoose wrapper
+        //         })
+        //         .lean()
+
+        //     if (!users || users.length === 0) {
+        //         throw new Error('No users found on this salida')
+        //     }
+        //     console.log(users)
+        //     const workbook = new ExcelJS.Workbook()
+        //     const worksheet = workbook.addWorksheet('Users')
+
+        //     worksheet.columns = [
+        //         { header: 'Name', key: 'name', width: 20 },
+        //         { header: 'Fecha de Nacimiento', key: 'fechaDeNacimiento', width: 20 },
+        //         { header: 'DNI', key: 'dni', width: 15 },
+        //     ]
+
+        //     users.forEach((user) => {
+        //         const userData = user.data[0] // Accedemos al primer elemento del arreglo data
+        //         worksheet.addRow({
+        //             name: userData.name,
+        //             fechaDeNacimiento: userData.fechaDeNacimiento,
+        //             dni: userData.dni,
+        //         })
+        //     })
+
+        //     const buffer = await workbook.xlsx.writeBuffer()
+
+        //     const filename = `users-on-salida-${salidaId}.xlsx`
+        //     const path = `./${filename}`
+
+        //     fs.writeFileSync(path, buffer, 'utf-8')
+
+        //     return [
+        //         {
+        //             filename,
+        //             path,
+        //             mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        //         },
+        //     ]
+        // },
 
         // confirmUsers: async (_, { salidaId, auth0UserIds }) => {
         //     const salida = await Salidas.findById(salidaId)
