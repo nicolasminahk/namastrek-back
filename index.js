@@ -109,7 +109,6 @@ const typeDefs = gql`
         protectedQuery(id: ID!): User
         findSalidasByAuth0UserId(auth0UserId: String!): [Salidas!]!
         findUsersOnSalida(salidaId: String!): [Data!]!
-
         findDataByAuth0UserId(auth0UserId: String!): Data!
         findBenefitByAuth0UserId(auth0UserId: String!): [Beneficios!]!
     }
@@ -223,15 +222,17 @@ const resolvers = {
             // Do something with the user entity, e.g. return it as part of the query response
             return user
         },
-        // findSalidasByAuth0UserId: async (root, args) => {
-        //     const auth0UserId = args
+
+        // findSalidasByAuth0UserId: async (root, { auth0UserId }) => {
         //     // Busca todas las salidas que contengan el auth0UserId en el arreglo de users
         //     const salidas = await Salidas.find({ users: auth0UserId })
         //     return salidas
         // },
         findSalidasByAuth0UserId: async (root, { auth0UserId }) => {
-            // Busca todas las salidas que contengan el auth0UserId en el arreglo de users
-            const salidas = await Salidas.find({ users: auth0UserId })
+            // Busca todas las salidas que contengan el auth0UserId en el arreglo de users o usersConfirm
+            const salidas = await Salidas.find({
+                $or: [{ users: auth0UserId }, { usersConfirm: auth0UserId }],
+            })
             return salidas
         },
         // findBenefitByAuth0UserId: async (root, { auth0UserId }) => {
@@ -267,6 +268,54 @@ const resolvers = {
             console.log('user find', { user })
             return user[0]
         },
+        // findUsersOnSalida: async (_, { salidaId }) => {
+        //     const salida = await Salidas.findById(salidaId)
+        //     console.log('findUsersOnSalida', salida.users)
+
+        //     if (!salida) {
+        //         throw new Error('Salida not found')
+        //     }
+
+        //     const users = await User.find({ auth0UserId: { $in: salida.users } })
+        //         .populate({
+        //             path: 'data',
+        //             select: 'name address phone profession obraSocial alergiaMedicamentos alergiaAlimentos tipoSangre fechaDeNacimiento dni',
+        //             options: { lean: true },
+        //         })
+        //         .lean()
+
+        //     console.log('USUARIOS ENCONTRADOS', users)
+
+        //     return users
+        // },
+        // findUsersOnSalida: async (_, { salidaId }) => {
+        //     const salida = await Salidas.findById(salidaId)
+        //     console.log('findUsersOnSalida', salida.users)
+
+        //     if (!salida) {
+        //         throw new Error('Salida not found')
+        //     }
+        //     const users = await User.find({ auth0UserId: { $in: salida.users } })
+        //         .populate({
+        //             path: 'data',
+        //             select: 'name adress phone profession obraSocial alergiaMedicamentos alergiaAlimentos tipoSangre fechaDeNacimiento dni  ',
+        //             options: { lean: true },
+        //         })
+        //         .lean()
+        //     console.log('USUARIOS ENCONTRADOS', users)
+        //     // if (users && users.length > 0) {
+        //     //     const userData = users[0].data
+        //     //     if (userData && userData.length > 0) {
+        //     //         console.log(userData)
+        //     //         return userData
+        //     //     } else {
+        //     //         return []
+        //     //     }
+        //     // } else {
+        //     //     return []
+        //     // }
+        //     return users
+        // },
         findUsersOnSalida: async (_, { salidaId }) => {
             const salida = await Salidas.findById(salidaId)
             console.log('findUsersOnSalida', salida.users)
@@ -274,25 +323,45 @@ const resolvers = {
             if (!salida) {
                 throw new Error('Salida not found')
             }
-            const users = await User.find({ auth0UserId: { $in: salida.users } })
-                .populate({
-                    path: 'data',
-                    select: 'name adress phone profession obraSocial alergiaMedicamentos alergiaAlimentos tipoSangre fechaDeNacimiento dni  ',
-                    options: { lean: true },
+
+            const users = await User.find({ auth0UserId: { $in: salida.users } }).lean()
+
+            console.log('USUARIOS ENCONTRADOS', users)
+
+            const populatedUsers = await Promise.all(
+                users.map(async (user) => {
+                    const data = await Data.findById(user.data).lean()
+                    return { ...user, data }
                 })
-                .lean()
-            if (users && users.length > 0) {
-                const userData = users[0].data
-                if (userData && userData.length > 0) {
-                    console.log(userData)
-                    return userData
-                } else {
-                    return []
-                }
-            } else {
-                return []
-            }
+            )
+
+            console.log('USUARIOS POBLADOS', populatedUsers)
+
+            //CON ESTE CONSOLE LOG PODEMOS VER QUE SI SE ACCEDE AL LOS VALORES DE DATA, PERO NO LOS RETORNA APOLLO
+
+            return populatedUsers
         },
+
+        // findUsersOnSalida: async (_, { salidaId }) => {
+        //     const salida = await Salidas.findById(salidaId)
+        //     console.log('findUsersOnSalida', salida.users)
+
+        //     if (!salida) {
+        //         throw new Error('Salida not found')
+        //     }
+
+        //     const users = await User.find({ auth0UserId: { $in: salida.users } })
+        //         .populate({
+        //             path: 'data',
+        //             select: 'name address phone profession obraSocial alergiaMedicamentos alergiaAlimentos tipoSangre fechaDeNacimiento dni',
+        //             options: { lean: true },
+        //         })
+        //         .lean()
+
+        //     console.log('USUARIOS ENCONTRADOS', users)
+
+        //     return users
+        // },
     },
     Mutation: {
         addPerson: (root, args) => {
@@ -377,11 +446,9 @@ const resolvers = {
 
             // Busca la salida por su id
             const salidaEncontrada = await Salidas.findById(salida)
-            console.log(salidaEncontrada)
             if (!salidaEncontrada) {
                 throw new Error('Salida not found') // Puedes personalizar el mensaje de error
             }
-            console.log('salida Usuarios', salidaEncontrada.users)
 
             // Verifica si el usuario ya está agregado a la salida
             if (salidaEncontrada.users.includes(auth0UserId)) {
@@ -393,37 +460,45 @@ const resolvers = {
             if (!user) {
                 throw new Error('User not found') // Puedes personalizar el mensaje de error
             }
-            console.log('user', user)
+            console.log('user SALIDA', user)
 
             // Verifica si la salida ya está en el arreglo de salidas del usuario
-            if (user.salidas.includes(salida)) {
-                throw new Error('Salida already added to the User') // Puedes personalizar el mensaje de error
+            if (user.salidas?.includes(salida)) {
+                if (!salidaEncontrada.users.includes(auth0UserId)) {
+                    salidaEncontrada.users.push(auth0UserId)
+                    console.log('USUARIOS DE LA SALIDA', salidaEncontrada.users)
+                }
             }
 
-            // Hace un push del auth0UserId al array de usuarios en salida
+            // // Hace un push del auth0UserId al array de usuarios en salida
             salidaEncontrada.users.push(auth0UserId)
+            // console.log('users después del push:', salidaEncontrada.users)
 
             // Hace un push de la salida al arreglo de salidas del usuario
             user.salidas.push(salida)
+            console.log('SALIDAS DEL USUARIO', user.salidas)
 
-            // Guarda los cambios en la salida y el usuario
-            const updatedSalida = await salidaEncontrada.save().catch((error) => {
-                console.error('Failed to save updated Salida:', error)
-                throw new Error('Failed to update Salida') // Puedes personalizar el mensaje de error
-            })
-            console.log('salida actualizada', updatedSalida) // Verifica que el campo "name" tenga un valor válido
+            // // Guarda los cambios en la salida y el usuario
+            // const updatedSalida = await salidaEncontrada.save().catch((error) => {
+            //     console.error('Failed to save updated Salida:', error)
+            //     throw new Error('Failed to update Salida') // Puedes personalizar el mensaje de error
+            // })
+            // console.log('salida actualizada', updatedSalida) // Verifica que el campo "name" tenga un valor válido
 
-            const updatedUser = await user.save().catch((error) => {
-                console.error('Failed to save updated User:', error)
-                throw new Error('Failed to update User') // Puedes personalizar el mensaje de error
-            })
-            console.log('user actualizado', updatedUser) // Verifica que el campo "auth0UserId" tenga un valor válido
+            // const updatedUser = await user.save().catch((error) => {
+            //     console.error('Failed to save updated User:', error)
+            //     throw new Error('Failed to update User') // Puedes personalizar el mensaje de error
+            // })
+            // console.log('user actualizado', updatedUser) // Verifica que el campo "auth0UserId" tenga un valor válido
 
-            if (!updatedSalida.name) {
-                throw new Error('Failed to update Salida') // Puedes personalizar el mensaje de error
-            }
+            // if (!updatedSalida.name) {
+            //     throw new Error('Failed to update Salida') // Puedes personalizar el mensaje de error
+            // }
 
-            return updatedSalida
+            // return updatedSalida
+            await salidaEncontrada.save()
+            await user.save()
+            return salidaEncontrada
         },
         confirmUsers: async (_, { salidaId, auth0UserIds }) => {
             const salida = await Salidas.findById(salidaId)
