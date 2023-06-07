@@ -136,7 +136,7 @@ const typeDefs = gql`
         createUser(id: String!, email: String!): User
         addDataToUser(data: DataInput!, auth0UserId: String!): Data!
         removePersonExit(salida: String!, auth0UserId: String!): Salidas
-        confirmUsers(salidaId: ID!, auth0UserIds: [String!]!): [UserConfirmation!]!
+        confirmUsers(salidaId: String!, auth0UserId: String!): Salidas
         findUsersOnSalidaInExcel(salidaId: String!): ExcelFile
     }
 
@@ -191,7 +191,6 @@ const resolvers = {
         },
         salidas: () => User.salidas,
         allSalidas: async (root, args, ctx) => {
-            console.log(ctx.token)
             return Salidas.find({})
         },
         allBeneficios: async (root, args) => {
@@ -223,11 +222,6 @@ const resolvers = {
             return user
         },
 
-        // findSalidasByAuth0UserId: async (root, { auth0UserId }) => {
-        //     // Busca todas las salidas que contengan el auth0UserId en el arreglo de users
-        //     const salidas = await Salidas.find({ users: auth0UserId })
-        //     return salidas
-        // },
         findSalidasByAuth0UserId: async (root, { auth0UserId }) => {
             // Busca todas las salidas que contengan el auth0UserId en el arreglo de users o usersConfirm
             const salidas = await Salidas.find({
@@ -235,24 +229,6 @@ const resolvers = {
             })
             return salidas
         },
-        // findBenefitByAuth0UserId: async (root, { auth0UserId }) => {
-        //     // Busca todas los beneficios que contengan el auth0UserId en el arreglo de users
-
-        //     const benefit = await Beneficios.find({ users: auth0UserId })
-        //     console.log('findBenefitByAuth0UserId', benefit)
-        //     return benefit
-        // },
-        // findBenefitByAuth0UserId: async (root, { auth0UserId }) => {
-        //     // Busca todas los beneficios que contengan el auth0UserId en el arreglo de users
-        //     const beneficios = await Beneficios.find({ users: auth0UserId })
-        //     console.log('benefit', beneficios)
-        //     // Devuelve los campos de cada beneficio
-        //     return beneficios.map((beneficio) => ({
-        //         name: beneficio.name,
-        //         description: beneficio.description,
-        //         date: beneficio.date,
-        //     }))
-        // },
         findBenefitByAuth0UserId: async (root, { auth0UserId }) => {
             try {
                 const beneficios = await Beneficios.find({ users: auth0UserId })
@@ -268,100 +244,36 @@ const resolvers = {
             console.log('user find', { user })
             return user[0]
         },
-        // findUsersOnSalida: async (_, { salidaId }) => {
-        //     const salida = await Salidas.findById(salidaId)
-        //     console.log('findUsersOnSalida', salida.users)
 
-        //     if (!salida) {
-        //         throw new Error('Salida not found')
-        //     }
-
-        //     const users = await User.find({ auth0UserId: { $in: salida.users } })
-        //         .populate({
-        //             path: 'data',
-        //             select: 'name address phone profession obraSocial alergiaMedicamentos alergiaAlimentos tipoSangre fechaDeNacimiento dni',
-        //             options: { lean: true },
-        //         })
-        //         .lean()
-
-        //     console.log('USUARIOS ENCONTRADOS', users)
-
-        //     return users
-        // },
-        // findUsersOnSalida: async (_, { salidaId }) => {
-        //     const salida = await Salidas.findById(salidaId)
-        //     console.log('findUsersOnSalida', salida.users)
-
-        //     if (!salida) {
-        //         throw new Error('Salida not found')
-        //     }
-        //     const users = await User.find({ auth0UserId: { $in: salida.users } })
-        //         .populate({
-        //             path: 'data',
-        //             select: 'name adress phone profession obraSocial alergiaMedicamentos alergiaAlimentos tipoSangre fechaDeNacimiento dni  ',
-        //             options: { lean: true },
-        //         })
-        //         .lean()
-        //     console.log('USUARIOS ENCONTRADOS', users)
-        //     // if (users && users.length > 0) {
-        //     //     const userData = users[0].data
-        //     //     if (userData && userData.length > 0) {
-        //     //         console.log(userData)
-        //     //         return userData
-        //     //     } else {
-        //     //         return []
-        //     //     }
-        //     // } else {
-        //     //     return []
-        //     // }
-        //     return users
-        // },
         findUsersOnSalida: async (_, { salidaId }) => {
             const salida = await Salidas.findById(salidaId)
-            console.log('findUsersOnSalida', salida.users)
 
             if (!salida) {
                 throw new Error('Salida not found')
             }
 
-            const users = await User.find({ auth0UserId: { $in: salida.users } }).lean()
+            const auth0UserIds = salida.users
 
-            console.log('USUARIOS ENCONTRADOS', users)
-
-            const populatedUsers = await Promise.all(
-                users.map(async (user) => {
-                    const data = await Data.findById(user.data).lean()
-                    return { ...user, data }
+            const users = await User.find({ auth0UserId: { $in: auth0UserIds } })
+                .populate({
+                    path: 'data',
+                    select: 'name',
+                    options: { lean: true },
                 })
-            )
+                .lean()
 
-            console.log('USUARIOS POBLADOS', populatedUsers)
+            console.log('USERS', users)
 
-            //CON ESTE CONSOLE LOG PODEMOS VER QUE SI SE ACCEDE AL LOS VALORES DE DATA, PERO NO LOS RETORNA APOLLO
+            const populatedUsers = users.map((user) => {
+                console.log(user.data)
+                const name = user.data.length > 0 ? user.data[0].name : null
+                return { ...user, name, auth0UserId: user.auth0UserId }
+            })
+
+            console.log('POPULATED USERS', populatedUsers)
 
             return populatedUsers
         },
-
-        // findUsersOnSalida: async (_, { salidaId }) => {
-        //     const salida = await Salidas.findById(salidaId)
-        //     console.log('findUsersOnSalida', salida.users)
-
-        //     if (!salida) {
-        //         throw new Error('Salida not found')
-        //     }
-
-        //     const users = await User.find({ auth0UserId: { $in: salida.users } })
-        //         .populate({
-        //             path: 'data',
-        //             select: 'name address phone profession obraSocial alergiaMedicamentos alergiaAlimentos tipoSangre fechaDeNacimiento dni',
-        //             options: { lean: true },
-        //         })
-        //         .lean()
-
-        //     console.log('USUARIOS ENCONTRADOS', users)
-
-        //     return users
-        // },
     },
     Mutation: {
         addPerson: (root, args) => {
@@ -442,8 +354,6 @@ const resolvers = {
             return user
         },
         addPersonExit: async (root, { salida, auth0UserId }) => {
-            console.log('salida', { salida, auth0UserId })
-
             // Busca la salida por su id
             const salidaEncontrada = await Salidas.findById(salida)
             if (!salidaEncontrada) {
@@ -478,74 +388,38 @@ const resolvers = {
             user.salidas.push(salida)
             console.log('SALIDAS DEL USUARIO', user.salidas)
 
-            // // Guarda los cambios en la salida y el usuario
-            // const updatedSalida = await salidaEncontrada.save().catch((error) => {
-            //     console.error('Failed to save updated Salida:', error)
-            //     throw new Error('Failed to update Salida') // Puedes personalizar el mensaje de error
-            // })
-            // console.log('salida actualizada', updatedSalida) // Verifica que el campo "name" tenga un valor válido
-
-            // const updatedUser = await user.save().catch((error) => {
-            //     console.error('Failed to save updated User:', error)
-            //     throw new Error('Failed to update User') // Puedes personalizar el mensaje de error
-            // })
-            // console.log('user actualizado', updatedUser) // Verifica que el campo "auth0UserId" tenga un valor válido
-
-            // if (!updatedSalida.name) {
-            //     throw new Error('Failed to update Salida') // Puedes personalizar el mensaje de error
-            // }
-
-            // return updatedSalida
             await salidaEncontrada.save()
             await user.save()
             return salidaEncontrada
         },
-        confirmUsers: async (_, { salidaId, auth0UserIds }) => {
+        confirmUsers: async (_, { salidaId, auth0UserId }) => {
             const salida = await Salidas.findById(salidaId)
+            const user = await User.findOne({ auth0UserId })
+
+            if (!user) {
+                throw new Error('User not found')
+            }
 
             if (!salida) {
                 throw new Error('Salida not found')
             }
 
-            const uniqueAuth0UserIds = [] // Arreglo auxiliar para almacenar los auth0UserIds únicos
-
-            const confirmedUsers = await User.find({ auth0UserId: { $in: auth0UserIds } })
-                .select('email salidasConfirm data')
-                .populate('data', 'name fechaDeNacimiento dni')
-                .exec()
-
-            if (!confirmedUsers || confirmedUsers.length === 0) {
-                throw new Error('No confirmed users found')
+            // Verificar si el auth0UserId ya existe en usersConfirm
+            if (!salida.usersConfirm.includes(auth0UserId)) {
+                salida.usersConfirm.push(auth0UserId)
             }
 
-            const userConfirmations = confirmedUsers.reduce((acc, user) => {
-                // Filtrar los auth0UserIds repetidos en el arreglo de usuarios confirmados
-                if (!uniqueAuth0UserIds.includes(user.auth0UserId)) {
-                    uniqueAuth0UserIds.push(user.auth0UserId)
-                    acc.push({
-                        user: {
-                            email: user.email,
-                            salidasConfirm: user.salidasConfirm,
-                        },
-                        data: {
-                            name: user.data.name,
-                            fechaDeNacimiento: user.data.fechaDeNacimiento,
-                            dni: user.data.dni,
-                        },
-                    })
+            // Verificar si la salidaId ya existe en salidasConfirm
+            if (!user.salidasConfirm.includes(salidaId)) {
+                user.salidasConfirm.push(salidaId)
+            }
 
-                    // Hacer push del id de la salida al arreglo de salidasConfirm en el usuario
-                    User.findByIdAndUpdate(user._id, { $addToSet: { salidasConfirm: salidaId } }).exec()
-                }
-                console.log(acc)
-                return acc
-            }, [])
-
-            // Hacer push del id de la salida al arreglo de usersConfirm en la salida
-            salida.usersConfirm = [...new Set([...salida.usersConfirm, ...uniqueAuth0UserIds])]
+            await user.save()
             await salida.save()
-            return userConfirmations
+
+            return salida
         },
+
         findUsersOnSalidaInExcel: async (_, { salidaId }) => {
             const salida = await Salidas.findById(salidaId)
 
@@ -563,6 +437,8 @@ const resolvers = {
                 })
                 .lean()
 
+            console.log('USERS', users)
+
             if (!users || users.length === 0) {
                 throw new Error('No users found on this salida')
             }
@@ -571,19 +447,19 @@ const resolvers = {
             const worksheet = workbook.addWorksheet('Users')
 
             worksheet.columns = [
-                { header: 'Name', key: 'name', width: 20 },
+                { header: 'Nombre', key: 'name', width: 20 },
                 { header: 'Fecha de Nacimiento', key: 'fechaDeNacimiento', width: 20 },
                 { header: 'DNI', key: 'dni', width: 15 },
             ]
 
-            users.forEach((user) => {
-                const userData = user.data[0]
-                worksheet.addRow({
-                    name: userData.name,
-                    fechaDeNacimiento: userData.fechaDeNacimiento,
-                    dni: userData.dni,
-                })
-            })
+            for (const user of users) {
+                const userData = await Data.findOne({ _id: { $in: user.data } }).lean()
+                const name = userData.name || ''
+                const fechaDeNacimiento = userData ? userData.fechaDeNacimiento || '' : ''
+                const dni = userData ? userData.dni || '' : ''
+
+                worksheet.addRow({ name, fechaDeNacimiento, dni })
+            }
 
             const tempFilePath = path.join(os.tmpdir(), `users-on-salida-${salidaId}.xlsx`)
 
@@ -602,196 +478,6 @@ const resolvers = {
             }
         },
 
-        // findUsersOnSalidaInExcel: async (_, { salidaId }) => {
-        //     const salida = await Salidas.findById(salidaId)
-
-        //     if (!salida) {
-        //         throw new Error('Salida not found')
-        //     }
-
-        //     const auth0UserIds = salida.usersConfirm
-
-        //     const users = await User.find({ auth0UserId: { $in: auth0UserIds } })
-        //         .populate({
-        //             path: 'data',
-        //             select: 'name fechaDeNacimiento dni',
-        //             options: { lean: true }, // Añadimos la opción lean: true para obtener documentos sin mongoose wrapper
-        //         })
-        //         .lean()
-
-        //     if (!users || users.length === 0) {
-        //         throw new Error('No users found on this salida')
-        //     }
-        //     console.log(users)
-        //     const workbook = new ExcelJS.Workbook()
-        //     const worksheet = workbook.addWorksheet('Users')
-
-        //     worksheet.columns = [
-        //         { header: 'Name', key: 'name', width: 20 },
-        //         { header: 'Fecha de Nacimiento', key: 'fechaDeNacimiento', width: 20 },
-        //         { header: 'DNI', key: 'dni', width: 15 },
-        //     ]
-
-        //     users.forEach((user) => {
-        //         const userData = user.data[0] // Accedemos al primer elemento del arreglo data
-        //         worksheet.addRow({
-        //             name: userData.name,
-        //             fechaDeNacimiento: userData.fechaDeNacimiento,
-        //             dni: userData.dni,
-        //         })
-        //     })
-
-        //     const buffer = await workbook.xlsx.writeBuffer()
-
-        //     const filename = `users-on-salida-${salidaId}.xlsx`
-        //     const path = `./${filename}`
-
-        //     fs.writeFileSync(path, buffer, 'utf-8')
-
-        //     return [
-        //         {
-        //             filename,
-        //             path,
-        //             mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        //         },
-        //     ]
-        // },
-
-        // confirmUsers: async (_, { salidaId, auth0UserIds }) => {
-        //     const salida = await Salidas.findById(salidaId)
-
-        //     if (!salida) {
-        //         throw new Error('Salida not found')
-        //     }
-
-        //     const uniqueAuth0UserIds = [] // Arreglo auxiliar para almacenar los auth0UserIds únicos
-
-        //     const confirmedUsers = await User.find({ auth0UserId: { $in: auth0UserIds } })
-        //         .populate('data', 'name fechaDeNacimiento dni')
-        //         .lean()
-
-        //     if (!confirmedUsers || confirmedUsers.length === 0) {
-        //         throw new Error('No confirmed users found')
-        //     }
-
-        //     const userConfirmations = confirmedUsers.reduce((acc, user) => {
-        //         // Filtrar los auth0UserIds repetidos en el arreglo de usuarios confirmados
-        //         if (!uniqueAuth0UserIds.includes(user.auth0UserId)) {
-        //             uniqueAuth0UserIds.push(user.auth0UserId)
-        //             acc.push({
-        //                 user,
-        //                 data: {
-        //                     name: user.data.name,
-        //                     fechaDeNacimiento: user.data.fechaDeNacimiento,
-        //                     dni: user.data.dni,
-        //                 },
-        //             })
-
-        //             // Hacer push del id de la salida al arreglo de salidasConfirm en el usuario
-        //             User.findByIdAndUpdate(user._id, { $push: { salidasConfirm: salidaId } }).exec()
-        //         }
-        //         return acc
-        //     }, [])
-
-        //     // Hacer push del id de la salida al arreglo de usersConfirm en la salida
-        //     salida.usersConfirm.push(...uniqueAuth0UserIds)
-        //     await salida.save()
-
-        //     return userConfirmations
-        // },
-
-        // confirmUsers: async (_, { salidaId, auth0UserIds }) => {
-        //     const salida = await Salidas.findById(salidaId)
-
-        //     if (!salida) {
-        //         throw new Error('Salida not found')
-        //     }
-
-        //     const uniqueAuth0UserIds = [] // Arreglo auxiliar para almacenar los auth0UserIds únicos
-
-        //     const confirmedUsers = await User.find({ auth0UserId: { $in: auth0UserIds } })
-        //         .populate('data', 'name fechaDeNacimiento dni')
-        //         .lean()
-
-        //     if (!confirmedUsers || confirmedUsers.length === 0) {
-        //         throw new Error('No confirmed users found')
-        //     }
-
-        //     const userConfirmations = confirmedUsers.reduce((acc, user) => {
-        //         // Filtrar los auth0UserIds repetidos en el arreglo de usuarios confirmados
-        //         if (!uniqueAuth0UserIds.includes(user.auth0UserId)) {
-        //             uniqueAuth0UserIds.push(user.auth0UserId)
-        //             acc.push({
-        //                 user,
-        //                 data: {
-        //                     name: user.data.name,
-        //                     fechaDeNacimiento: user.data.fechaDeNacimiento,
-        //                     dni: user.data.dni,
-        //                 },
-        //             })
-        //         }
-        //         return acc
-        //     }, [])
-
-        //     User.salidasConfirm.push(salidaId)
-
-        //     return userConfirmations
-        // },
-
-        // addPersonBenefit: async (root, { benefit, auth0UserId }) => {
-        //     // Busca la salida por su id
-        //     const benefitEncontrado = await Beneficios.findById(benefit)
-        //     console.log(benefitEncontrado)
-        //     if (!benefitEncontrado) {
-        //         throw new Error('Benefit not found') // Puedes personalizar el mensaje de error
-        //     }
-        //     console.log('Beneficio', benefitEncontrado)
-
-        //     // Busca el usuario por su id
-        //     const user = await User.findOne({ auth0UserId })
-        //     console.log('User', user)
-
-        //     // Verifica si el usuario ya tiene dos o más elementos en el arreglo de salidas
-        //     if (user.salidas.length >= 2) {
-        //         // Hace un push del beneficio al arreglo de beneficios del usuario
-        //         user.beneficios.push(benefitEncontrado)
-        //         // Guarda los cambios en la base de datos
-        //         await user.save()
-        //         return user
-        //     } else {
-        //         throw new Error('User does not have enough salidas') // Puedes personalizar el mensaje de error
-        //     }
-        // },
-        // addPersonBenefit: async (root, { benefit, auth0UserId }) => {
-        //     const benefitEncontrado = await Beneficios.findById(benefit)
-        //     if (!benefitEncontrado) {
-        //         throw new Error('Benefit not found') // Puedes personalizar el mensaje de error
-        //     }
-
-        //     const user = await User.findOne({ auth0UserId })
-        //     if (!user) {
-        //         throw new Error('User not found') // Puedes personalizar el mensaje de error
-        //     }
-        //     console.log('USER BENEFIT', user)
-        //     console.log('Beneficio', benefitEncontrado)
-        //     if (user.salidas.length >= 1) {
-        //         // Hace un push del beneficio al arreglo de beneficios del usuario
-        //         user.beneficios.push(benefitEncontrado)
-
-        //         // Hace un push del usuario al arreglo de usuarios del beneficio
-        //         if (benefitEncontrado) {
-        //             benefitEncontrado.users.push(auth0UserId)
-        //         }
-
-        //         // Guarda los cambios en la base de datos
-        //         await user.save()
-        //         await benefitEncontrado.save()
-
-        //         return user
-        //     } else {
-        //         throw new Error('User does not have enough salidas') // Puedes personalizar el mensaje de error
-        //     }
-        // },
         addPersonBenefit: async (root, { benefit, auth0UserId }) => {
             const benefitEncontrado = await Beneficios.findById(benefit)
             if (!benefitEncontrado) {
@@ -866,6 +552,7 @@ const resolvers = {
 
             // Usa el método pull de Mongoose para eliminar el ID del usuario del array de users
             salidaEncontrada.users.pull(auth0UserId)
+            salidaEncontrada.usersConfirm.pull(auth0UserId)
 
             // Guarda los cambios en la salida
             const updatedSalida = await salidaEncontrada.save().catch((error) => {
